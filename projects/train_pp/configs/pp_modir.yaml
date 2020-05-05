@@ -1,0 +1,33 @@
+_BASE_: "../../../configs/COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+OUTPUT_DIR: "../../output"
+DATASETS:
+    TRAIN: ("pp_modir_train",)
+    TEST: ("pp_modir_val",)
+MODEL:
+    WEIGHTS: "../../weights/faster_rcnn_R_50_FPN_3x/model_final_280758.pkl"
+    # WEIGHTS: "..../weights/R-50.pkl"
+    # WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+    ROI_HEADS:
+        NUM_CLASSES: 1
+    ANCHOR_GENERATOR:
+        SIZES: [[43, 117, 217, 348, 521]]
+        # SIZES: [[32, 64, 128, 256, 512]]
+        ASPECT_RATIOS: [[0.4, 1.3, 3.1]]
+        # ASPECT_RATIOS: [[0.5, 1.0, 2.0]]
+SOLVER:
+    IMS_PER_BATCH: 4
+    # IMS_PER_BATCH: 16
+    BASE_LR: 0.01
+    BASE_LR: 0.02
+    STEPS: (60000, 120000, 180000)
+    # STEPS: (210000, 250000)
+    MAX_ITER: 200000
+    # MAX_ITER: 270000
+    # WARMUP_ITERS: 10
+INPUT:
+    CROP:
+        ENABLED: True
+        TYPE: "relative_range"
+        SIZE: [0.5, 1.0]
+TEST:
+    EVAL_PERIOD: 6000
