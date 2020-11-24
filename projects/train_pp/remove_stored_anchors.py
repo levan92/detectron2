@@ -3,6 +3,7 @@ from pathlib import Path
 
 parser = argparse.ArgumentParser()
 parser.add_argument('pthfile',help='path to pth file')
+parser.add_argument('--keep-wts', help='flag to not del rpn head wts and bias', action='store_true')
 args = parser.parse_args()
 
 if args.pthfile.endswith('.pkl'):
@@ -16,6 +17,8 @@ elif args.pthfile.endswith('.pth'):
 anchorkeys = []
 for k in data['model'].keys():
     if 'anchor' in k:
+        if args.keep_wts and ('weight' in k or 'bias' in k):
+            continue
         anchorkeys.append(k)
 
 for k in anchorkeys:
