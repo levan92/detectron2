@@ -109,7 +109,7 @@ class AugDatasetMapper:
         image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
         utils.check_image_size(dataset_dict, image)
 
-        if "annotations" not in dataset_dict:
+        if "annotations" not in dataset_dict or len(dataset_dict['annotations'])==0 :
             image, transforms = T.apply_transform_gens(
                 ([self.crop_gen] if self.crop_gen else []) + self.tfm_gens, image
             )
