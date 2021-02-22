@@ -157,7 +157,10 @@ if __name__ == "__main__":
     assert Path(val_json).is_file()
     register_coco_instances(train_dataset_name, {}, train_json, dataset_image_root)
     register_coco_instances(val_dataset_name, {}, val_json, dataset_image_root)
-    
+
+    val_cococats_json = '/media/dh/HDD/pp/pp_modir/pp_val_cococats.json'
+    val_cococats_dataset_name = 'pp_modir_val_cococats'
+    register_coco_instances(val_cococats_dataset_name, {}, val_cococats_json, dataset_image_root)
     
     args = default_argument_parser().parse_args()
     print("Command Line Args:", args)
