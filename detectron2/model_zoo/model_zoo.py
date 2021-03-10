@@ -1,5 +1,6 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import os
+from typing import Optional
 import pkg_resources
 import torch
 
@@ -29,9 +30,9 @@ class _ModelZooUrls(object):
         "COCO-Detection/faster_rcnn_R_101_FPN_3x.yaml": "137851257/model_final_f6e8b1.pkl",
         "COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml": "139173657/model_final_68b088.pkl",
         # COCO Detection with RetinaNet
-        "COCO-Detection/retinanet_R_50_FPN_1x.yaml": "137593951/model_final_b796dc.pkl",
-        "COCO-Detection/retinanet_R_50_FPN_3x.yaml": "137849486/model_final_4cafe0.pkl",
-        "COCO-Detection/retinanet_R_101_FPN_3x.yaml": "138363263/model_final_59f53c.pkl",
+        "COCO-Detection/retinanet_R_50_FPN_1x.yaml": "190397773/model_final_bfca0b.pkl",
+        "COCO-Detection/retinanet_R_50_FPN_3x.yaml": "190397829/model_final_5bd44e.pkl",
+        "COCO-Detection/retinanet_R_101_FPN_3x.yaml": "190397697/model_final_971ab9.pkl",
         # COCO Detection with RPN and Fast R-CNN
         "COCO-Detection/rpn_R_50_C4_1x.yaml": "137258005/model_final_450694.pkl",
         "COCO-Detection/rpn_R_50_FPN_1x.yaml": "137258492/model_final_02ce48.pkl",
@@ -57,9 +58,9 @@ class _ModelZooUrls(object):
         "COCO-PanopticSegmentation/panoptic_fpn_R_50_3x.yaml": "139514569/model_final_c10459.pkl",
         "COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml": "139514519/model_final_cafdb1.pkl",
         # LVIS Instance Segmentation Baselines with Mask R-CNN
-        "LVIS-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml": "144219072/model_final_571f7c.pkl",
-        "LVIS-InstanceSegmentation/mask_rcnn_R_101_FPN_1x.yaml": "144219035/model_final_824ab5.pkl",
-        "LVIS-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_1x.yaml": "144219108/model_final_5e3439.pkl",  # noqa
+        "LVISv0.5-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml": "144219072/model_final_571f7c.pkl",  # noqa
+        "LVISv0.5-InstanceSegmentation/mask_rcnn_R_101_FPN_1x.yaml": "144219035/model_final_824ab5.pkl",  # noqa
+        "LVISv0.5-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_1x.yaml": "144219108/model_final_5e3439.pkl",  # noqa
         # Cityscapes & Pascal VOC Baselines
         "Cityscapes/mask_rcnn_R_50_FPN.yaml": "142423278/model_final_af9cf5.pkl",
         "PascalVOC-Detection/faster_rcnn_R_50_C4.yaml": "142202221/model_final_b1acc2.pkl",
@@ -71,6 +72,8 @@ class _ModelZooUrls(object):
         "Misc/mask_rcnn_R_50_FPN_3x_syncbn.yaml": "169527823/model_final_3b3c51.pkl",
         "Misc/mask_rcnn_R_50_FPN_3x_gn.yaml": "138602888/model_final_dc5d9e.pkl",
         "Misc/scratch_mask_rcnn_R_50_FPN_3x_gn.yaml": "138602908/model_final_01ca85.pkl",
+        "Misc/scratch_mask_rcnn_R_50_FPN_9x_gn.yaml": "183808979/model_final_da7b4c.pkl",
+        "Misc/scratch_mask_rcnn_R_50_FPN_9x_syncbn.yaml": "184226666/model_final_5ce33e.pkl",
         "Misc/panoptic_fpn_R_101_dconv_cascade_gn_3x.yaml": "139797668/model_final_be35db.pkl",
         "Misc/cascade_mask_rcnn_X_152_32x8d_FPN_IN5k_gn_dconv.yaml": "18131413/model_0039999_e76410.pkl",  # noqa
         # D1 Comparisons
@@ -117,32 +120,51 @@ def get_config_file(config_path):
     return cfg_file
 
 
-def get(config_path, trained: bool = False):
+def get_config(config_path, trained: bool = False):
+    """
+    Returns a config object for a model in model zoo.
+
+    Args:
+        config_path (str): config file name relative to detectron2's "configs/"
+            directory, e.g., "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+        trained (bool): If True, will set ``MODEL.WEIGHTS`` to trained model zoo weights.
+            If False, the checkpoint specified in the config file's ``MODEL.WEIGHTS`` is used
+            instead; this will typically (though not always) initialize a subset of weights using
+            an ImageNet pre-trained model, while randomly initializing the other weights.
+
+    Returns:
+        CfgNode: a config object
+    """
+    cfg_file = get_config_file(config_path)
+    cfg = get_cfg()
+    cfg.merge_from_file(cfg_file)
+    if trained:
+        cfg.MODEL.WEIGHTS = get_checkpoint_url(config_path)
+    return cfg
+
+
+def get(config_path, trained: bool = False, device: Optional[str] = None):
     """
     Get a model specified by relative path under Detectron2's official ``configs/`` directory.
 
     Args:
         config_path (str): config file name relative to detectron2's "configs/"
             directory, e.g., "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
-        trained (bool): If True, will initialize the model with the trained model zoo weights.
-            If False, the checkpoint specified in the config file's ``MODEL.WEIGHTS`` is used
-            instead; this will typically (though not always) initialize a subset of weights using
-            an ImageNet pre-trained model, while randomly initializing the other weights.
+        trained (bool): see :func:`get_config`.
+        device (str or None): overwrite the device in config, if given.
+
+    Returns:
+        nn.Module: a detectron2 model. Will be in training mode.
 
     Example:
-
-    .. code-block:: python
-
+    ::
         from detectron2 import model_zoo
         model = model_zoo.get("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml", trained=True)
     """
-    cfg_file = get_config_file(config_path)
-
-    cfg = get_cfg()
-    cfg.merge_from_file(cfg_file)
-    if trained:
-        cfg.MODEL.WEIGHTS = get_checkpoint_url(config_path)
-    if not torch.cuda.is_available():
+    cfg = get_config(config_path, trained)
+    if device is not None:
+        cfg.MODEL.DEVICE = device
+    elif not torch.cuda.is_available():
         cfg.MODEL.DEVICE = "cpu"
 
     model = build_model(cfg)

@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import logging
 import unittest
 import torch
@@ -39,7 +39,7 @@ class TestAnchorGenerator(unittest.TestCase):
             ]
         )
 
-        assert torch.allclose(anchors[0].tensor, expected_anchor_tensor)
+        self.assertTrue(torch.allclose(anchors[0].tensor, expected_anchor_tensor))
 
     def test_default_anchor_generator_centered(self):
         # test explicit args
@@ -68,11 +68,10 @@ class TestAnchorGenerator(unittest.TestCase):
         )
 
         anchors = anchor_generator([features["stage3"]])
-        assert torch.allclose(anchors[0].tensor, expected_anchor_tensor)
+        self.assertTrue(torch.allclose(anchors[0].tensor, expected_anchor_tensor))
 
-        # doesn't work yet
-        # anchors = torch.jit.script(anchor_generator)([features["stage3"]])
-        # assert torch.allclose(anchors[0].tensor, expected_anchor_tensor)
+        anchors = torch.jit.script(anchor_generator)([features["stage3"]])
+        self.assertTrue(torch.allclose(anchors[0].tensor, expected_anchor_tensor))
 
     def test_rrpn_anchor_generator(self):
         cfg = get_cfg()
@@ -114,7 +113,7 @@ class TestAnchorGenerator(unittest.TestCase):
             ]
         )
 
-        assert torch.allclose(anchors[0].tensor, expected_anchor_tensor)
+        self.assertTrue(torch.allclose(anchors[0].tensor, expected_anchor_tensor))
 
 
 if __name__ == "__main__":

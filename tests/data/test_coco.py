@@ -1,9 +1,10 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
 import json
 import numpy as np
 import os
 import tempfile
 import unittest
-import pycocotools
+import pycocotools.mask as mask_util
 
 from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets.coco import convert_to_coco_dict, load_coco_json
@@ -25,11 +26,27 @@ def make_mask():
     return mask
 
 
-def make_dataset_dicts(mask):
+def uncompressed_rle(mask):
+    l = mask.flatten(order="F").tolist()
+    counts = []
+    p = False
+    cnt = 0
+    for i in l:
+        if i == p:
+            cnt += 1
+        else:
+            counts.append(cnt)
+            p = i
+            cnt = 1
+    counts.append(cnt)
+    return {"counts": counts, "size": [mask.shape[0], mask.shape[1]]}
+
+
+def make_dataset_dicts(mask, compressed: bool = True):
     """
     Returns a list of dicts that represents a single COCO data point for
     object detection. The single instance given by `mask` is represented by
-    RLE.
+    RLE, either compressed or uncompressed.
     """
     record = {}
     record["file_name"] = "test"
@@ -38,7 +55,10 @@ def make_dataset_dicts(mask):
     record["width"] = mask.shape[1]
 
     y, x = np.nonzero(mask)
-    segmentation = pycocotools.mask.encode(np.asarray(mask, order="F"))
+    if compressed:
+        segmentation = mask_util.encode(np.asarray(mask, order="F"))
+    else:
+        segmentation = uncompressed_rle(mask)
     min_x = np.min(x)
     max_x = np.max(x)
     min_y = np.min(y)
@@ -72,5 +92,48 @@ class TestRLEToJson(unittest.TestCase):
 
         # Check the loaded mask matches the original.
         anno = dicts[0]["annotations"][0]
-        loaded_mask = pycocotools.mask.decode(anno["segmentation"])
+        loaded_mask = mask_util.decode(anno["segmentation"])
         self.assertTrue(np.array_equal(loaded_mask, mask))
+        DatasetCatalog.pop("test_dataset")
+        MetadataCatalog.pop("test_dataset")
+
+    def test_uncompressed_RLE(self):
+        mask = make_mask()
+        rle = mask_util.encode(np.asarray(mask, order="F"))
+        uncompressed = uncompressed_rle(mask)
+        compressed = mask_util.frPyObjects(uncompressed, *rle["size"])
+        self.assertEqual(rle, compressed)
+
+
+class TestConvertCOCO(unittest.TestCase):
+    @staticmethod
+    def generate_data():
+        record = {
+            "file_name": "test",
+            "image_id": 0,
+            "height": 100,
+            "width": 100,
+            "annotations": [
+                {
+                    "bbox": [10, 10, 10, 10, 5],
+                    "bbox_mode": BoxMode.XYWHA_ABS,
+                    "category_id": 0,
+                    "iscrowd": 0,
+                },
+                {
+                    "bbox": [15, 15, 3, 3],
+                    "bbox_mode": BoxMode.XYXY_ABS,
+                    "category_id": 0,
+                    "iscrowd": 0,
+                },
+            ],
+        }
+
+        return [record]
+
+    def test_convert_to_coco(self):
+        DatasetCatalog.register("test_dataset", lambda: TestConvertCOCO.generate_data())
+        MetadataCatalog.get("test_dataset").set(thing_classes=["test_label"])
+        convert_to_coco_dict("test_dataset")
+        DatasetCatalog.pop("test_dataset")
+        MetadataCatalog.pop("test_dataset")

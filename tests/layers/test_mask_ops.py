@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 
 import contextlib
 import io
 import numpy as np
-import os
 import unittest
 from collections import defaultdict
 import torch
@@ -23,6 +22,8 @@ from detectron2.layers.mask_ops import (
 )
 from detectron2.structures import BitMasks, Boxes, BoxMode, PolygonMasks
 from detectron2.structures.masks import polygons_to_bitmask
+from detectron2.utils.file_io import PathManager
+from detectron2.utils.testing import random_boxes
 
 
 def iou_between_full_image_bit_masks(a, b):
@@ -38,8 +39,8 @@ def rasterize_polygons_with_grid_sample(full_image_bit_mask, box, mask_size, thr
 
     mask_y = np.arange(0.0, mask_size) + 0.5  # mask y sample coords in [0.5, mask_size - 0.5]
     mask_x = np.arange(0.0, mask_size) + 0.5  # mask x sample coords in [0.5, mask_size - 0.5]
-    mask_y = (mask_y) / (mask_size) * (y1 - y0) + y0
-    mask_x = (mask_x) / (mask_size) * (x1 - x0) + x0
+    mask_y = mask_y / mask_size * (y1 - y0) + y0
+    mask_x = mask_x / mask_size * (x1 - x0) + x0
 
     mask_x = (mask_x - 0.5) / (img_w - 1) * 2 + -1
     mask_y = (mask_y - 0.5) / (img_h - 1) * 2 + -1
@@ -59,9 +60,10 @@ def rasterize_polygons_with_grid_sample(full_image_bit_mask, box, mask_size, thr
 class TestMaskCropPaste(unittest.TestCase):
     def setUp(self):
         json_file = MetadataCatalog.get("coco_2017_val_100").json_file
-        if not os.path.isfile(json_file):
+        if not PathManager.isfile(json_file):
             raise unittest.SkipTest("{} not found".format(json_file))
         with contextlib.redirect_stdout(io.StringIO()):
+            json_file = PathManager.get_local_path(json_file)
             self.coco = COCO(json_file)
 
     def test_crop_paste_consistency(self):
@@ -150,6 +152,17 @@ class TestMaskCropPaste(unittest.TestCase):
             area = polygon.area()[0]
             target = d ** 2 / 2
             self.assertEqual(area, target)
+
+    def test_paste_mask_scriptable(self):
+        scripted_f = torch.jit.script(paste_masks_in_image)
+        N = 10
+        masks = torch.rand(N, 28, 28)
+        boxes = Boxes(random_boxes(N, 100))
+        image_shape = (150, 150)
+
+        out = paste_masks_in_image(masks, boxes, image_shape)
+        scripted_out = scripted_f(masks, boxes, image_shape)
+        self.assertTrue(torch.equal(out, scripted_out))
 
 
 def benchmark_paste():

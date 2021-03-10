@@ -1,4 +1,5 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
+import collections
 import math
 from typing import List
 import torch
@@ -22,16 +23,10 @@ class BufferList(nn.Module):
     Similar to nn.ParameterList, but for buffers
     """
 
-    def __init__(self, buffers=None):
-        super(BufferList, self).__init__()
-        if buffers is not None:
-            self.extend(buffers)
-
-    def extend(self, buffers):
-        offset = len(self)
+    def __init__(self, buffers):
+        super().__init__()
         for i, buffer in enumerate(buffers):
-            self.register_buffer(str(offset + i), buffer)
-        return self
+            self.register_buffer(str(i), buffer)
 
     def __len__(self):
         return len(self._buffers)
@@ -68,10 +63,10 @@ def _broadcast_params(params, num_features, name):
         list[list[float]]: param for each feature
     """
     assert isinstance(
-        params, (list, tuple)
+        params, collections.abc.Sequence
     ), f"{name} in anchor generator has to be a list! Got {params}."
     assert len(params), f"{name} in anchor generator cannot be empty!"
-    if not isinstance(params[0], (list, tuple)):  # list[float]
+    if not isinstance(params[0], collections.abc.Sequence):  # params is list[float]
         return [params] * num_features
     if len(params) == 1:
         return list(params) * num_features
@@ -89,7 +84,7 @@ class DefaultAnchorGenerator(nn.Module):
     "Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks".
     """
 
-    box_dim: int = 4
+    box_dim: torch.jit.Final[int] = 4
     """
     the dimension of each anchor box.
     """
@@ -101,9 +96,9 @@ class DefaultAnchorGenerator(nn.Module):
 
         Args:
             sizes (list[list[float]] or list[float]):
-                If sizes is list[list[float]], sizes[i] is the list of anchor sizes
+                If ``sizes`` is list[list[float]], ``sizes[i]`` is the list of anchor sizes
                 (i.e. sqrt of anchor area) to use for the i-th feature map.
-                If sizes is list[float], the sizes are used for all feature maps.
+                If ``sizes`` is list[float], ``sizes`` is used for all feature maps.
                 Anchor sizes are given in absolute lengths in units of
                 the input image; they do not dynamically scale if the input image size changes.
             aspect_ratios (list[list[float]] or list[float]): list of aspect ratios
@@ -140,7 +135,16 @@ class DefaultAnchorGenerator(nn.Module):
         return BufferList(cell_anchors)
 
     @property
+    @torch.jit.unused
     def num_cell_anchors(self):
+        """
+        Alias of `num_anchors`.
+        """
+        return self.num_anchors
+
+    @property
+    @torch.jit.unused
+    def num_anchors(self):
         """
         Returns:
             list[int]: Each int is the number of anchors at every pixel
@@ -149,13 +153,19 @@ class DefaultAnchorGenerator(nn.Module):
                 ratios and 5 sizes, the number of anchors is 15.
                 (See also ANCHOR_GENERATOR.SIZES and ANCHOR_GENERATOR.ASPECT_RATIOS in config)
 
-                In standard RPN models, `num_cell_anchors` on every feature map is the same.
+                In standard RPN models, `num_anchors` on every feature map is the same.
         """
         return [len(cell_anchors) for cell_anchors in self.cell_anchors]
 
     def _grid_anchors(self, grid_sizes: List[List[int]]):
+        """
+        Returns:
+            list[Tensor]: #featuremap tensors, each is (#locations x #cell_anchors) x 4
+        """
         anchors = []
-        for size, stride, base_anchors in zip(grid_sizes, self.strides, self.cell_anchors):
+        # buffers() not supported by torchscript. use named_buffers() instead
+        buffers: List[torch.Tensor] = [x[1] for x in self.cell_anchors.named_buffers()]
+        for size, stride, base_anchors in zip(grid_sizes, self.strides, buffers):
             shift_x, shift_y = _create_grid_offsets(size, stride, self.offset, base_anchors.device)
             shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
 
@@ -200,7 +210,7 @@ class DefaultAnchorGenerator(nn.Module):
                 anchors.append([x0, y0, x1, y1])
         return torch.tensor(anchors)
 
-    def forward(self, features):
+    def forward(self, features: List[torch.Tensor]):
         """
         Args:
             features (list[Tensor]): list of backbone feature maps on which to generate anchors.
@@ -281,6 +291,13 @@ class RotatedAnchorGenerator(nn.Module):
     @property
     def num_cell_anchors(self):
         """
+        Alias of `num_anchors`.
+        """
+        return self.num_anchors
+
+    @property
+    def num_anchors(self):
+        """
         Returns:
             list[int]: Each int is the number of anchors at every pixel
                 location, on that feature map.
@@ -289,7 +306,7 @@ class RotatedAnchorGenerator(nn.Module):
                 (See also ANCHOR_GENERATOR.SIZES, ANCHOR_GENERATOR.ASPECT_RATIOS
                 and ANCHOR_GENERATOR.ANGLES in config)
 
-                In standard RRPN models, `num_cell_anchors` on every feature map is the same.
+                In standard RRPN models, `num_anchors` on every feature map is the same.
         """
         return [len(cell_anchors) for cell_anchors in self.cell_anchors]
 

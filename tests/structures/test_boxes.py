@@ -1,11 +1,13 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import json
 import math
 import numpy as np
 import unittest
 import torch
 
-from detectron2.structures import Boxes, BoxMode, pairwise_iou
+from detectron2.structures import Boxes, BoxMode, pairwise_ioa, pairwise_iou
+from detectron2.utils.env import TORCH_VERSION
+from detectron2.utils.testing import reload_script_model
 
 
 class TestBoxMode(unittest.TestCase):
@@ -146,7 +148,7 @@ class TestBoxMode(unittest.TestCase):
 
 
 class TestBoxIOU(unittest.TestCase):
-    def test_pairwise_iou(self):
+    def create_boxes(self):
         boxes1 = torch.tensor([[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]])
 
         boxes2 = torch.tensor(
@@ -159,7 +161,10 @@ class TestBoxIOU(unittest.TestCase):
                 [0.5, 0.5, 1.5, 1.5],
             ]
         )
+        return boxes1, boxes2
 
+    def test_pairwise_iou(self):
+        boxes1, boxes2 = self.create_boxes()
         expected_ious = torch.tensor(
             [
                 [1.0, 0.5, 0.5, 0.25, 0.25, 0.25 / (2 - 0.25)],
@@ -168,14 +173,49 @@ class TestBoxIOU(unittest.TestCase):
         )
 
         ious = pairwise_iou(Boxes(boxes1), Boxes(boxes2))
-
         self.assertTrue(torch.allclose(ious, expected_ious))
+
+    def test_pairwise_ioa(self):
+        boxes1, boxes2 = self.create_boxes()
+        expected_ioas = torch.tensor(
+            [[1.0, 1.0, 1.0, 1.0, 1.0, 0.25], [1.0, 1.0, 1.0, 1.0, 1.0, 0.25]]
+        )
+        ioas = pairwise_ioa(Boxes(boxes1), Boxes(boxes2))
+        self.assertTrue(torch.allclose(ioas, expected_ioas))
 
 
 class TestBoxes(unittest.TestCase):
     def test_empty_cat(self):
         x = Boxes.cat([])
         self.assertTrue(x.tensor.shape, (0, 4))
+
+    def test_to(self):
+        x = Boxes(torch.rand(3, 4))
+        self.assertEqual(x.to(device="cpu").tensor.device.type, "cpu")
+
+    @unittest.skipIf(TORCH_VERSION < (1, 8), "Insufficient pytorch version")
+    def test_scriptability(self):
+        def func(x):
+            boxes = Boxes(x)
+            test = boxes.to(torch.device("cpu")).tensor
+            return boxes.area(), test
+
+        f = torch.jit.script(func)
+        f = reload_script_model(f)
+        f(torch.rand((3, 4)))
+
+        data = torch.rand((3, 4))
+
+        def func_cat(x: torch.Tensor):
+            boxes1 = Boxes(x)
+            boxes2 = Boxes(x)
+            # boxes3 = Boxes.cat([boxes1, boxes2])  # this is not supported by torchsript for now.
+            boxes3 = boxes1.cat([boxes1, boxes2])
+            return boxes3
+
+        f = torch.jit.script(func_cat)
+        script_box = f(data)
+        self.assertTrue(torch.equal(torch.cat([data, data]), script_box.tensor))
 
 
 if __name__ == "__main__":

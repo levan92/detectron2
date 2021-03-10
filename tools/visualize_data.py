@@ -1,12 +1,10 @@
 #!/usr/bin/env python
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import argparse
-import numpy as np
 import os
 from itertools import chain
 import cv2
 import tqdm
-from PIL import Image
 
 from detectron2.config import get_cfg
 from detectron2.data import DatasetCatalog, MetadataCatalog, build_detection_train_loader
@@ -21,6 +19,7 @@ def setup(args):
     if args.config_file:
         cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+    cfg.DATALOADER.NUM_WORKERS = 0
     cfg.freeze()
     return cfg
 
@@ -65,17 +64,14 @@ if __name__ == "__main__":
             print("Saving to {} ...".format(filepath))
             vis.save(filepath)
 
-    scale = 2.0 if args.show else 1.0
+    scale = 1.0
     if args.source == "dataloader":
         train_data_loader = build_detection_train_loader(cfg)
         for batch in train_data_loader:
             for per_image in batch:
                 # Pytorch tensor is in (C, H, W) format
-                img = per_image["image"].permute(1, 2, 0)
-                if cfg.INPUT.FORMAT == "BGR":
-                    img = img[:, :, [2, 1, 0]]
-                else:
-                    img = np.asarray(Image.fromarray(img, mode=cfg.INPUT.FORMAT).convert("RGB"))
+                img = per_image["image"].permute(1, 2, 0).cpu().detach().numpy()
+                img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
 
                 visualizer = Visualizer(img, metadata=metadata, scale=scale)
                 target_fields = per_image["instances"].get_fields()

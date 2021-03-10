@@ -1,6 +1,5 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import copy
-import logging
 import math
 from typing import List
 import torch
@@ -13,16 +12,31 @@ from detectron2.modeling.anchor_generator import DefaultAnchorGenerator
 from detectron2.modeling.backbone import build_backbone
 from detectron2.modeling.box_regression import Box2BoxTransform
 from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
-from detectron2.modeling.meta_arch.retinanet import (
-    permute_all_cls_and_box_to_N_HWA_K_and_concat,
-    permute_to_N_HWA_K,
-)
+from detectron2.modeling.meta_arch.retinanet import permute_to_N_HWA_K
 from detectron2.structures import Boxes, ImageList, Instances
-from detectron2.utils.logger import log_first_n
 
 from tensormask.layers import SwapAlign2Nat
 
 __all__ = ["TensorMask"]
+
+
+def permute_all_cls_and_box_to_N_HWA_K_and_concat(pred_logits, pred_anchor_deltas, num_classes=80):
+    """
+    Rearrange the tensor layout from the network output, i.e.:
+    list[Tensor]: #lvl tensors of shape (N, A x K, Hi, Wi)
+    to per-image predictions, i.e.:
+    Tensor: of shape (N x sum(Hi x Wi x A), K)
+    """
+    # for each feature level, permute the outputs to make them be in the
+    # same format as the labels.
+    pred_logits_flattened = [permute_to_N_HWA_K(x, num_classes) for x in pred_logits]
+    pred_anchor_deltas_flattened = [permute_to_N_HWA_K(x, 4) for x in pred_anchor_deltas]
+    # concatenate on the first dimension (representing the feature levels), to
+    # take into account the way the labels were generated (with all feature maps
+    # being concatenated as well)
+    pred_logits = cat(pred_logits_flattened, dim=1).view(-1, num_classes)
+    pred_anchor_deltas = cat(pred_anchor_deltas_flattened, dim=1).view(-1, 4)
+    return pred_logits, pred_anchor_deltas
 
 
 def _assignment_rule(
@@ -334,8 +348,8 @@ class TensorMask(nn.Module):
         )
         # box transform
         self.box2box_transform = Box2BoxTransform(weights=cfg.MODEL.TENSOR_MASK.BBOX_REG_WEIGHTS)
-        self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
-        self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
+        self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1), False)
+        self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1), False)
 
     @property
     def device(self):
@@ -359,11 +373,6 @@ class TensorMask(nn.Module):
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
-        elif "targets" in batched_inputs[0]:
-            log_first_n(
-                logging.WARN, "'targets' in the model inputs is now renamed to 'instances'!", n=10
-            )
-            gt_instances = [x["targets"].to(self.device) for x in batched_inputs]
         else:
             gt_instances = None
 
@@ -842,7 +851,7 @@ class TensorMaskHead(nn.Module):
                     torch.nn.init.constant_(layer.bias, 0)
 
         # Use prior in model initialization to improve stability
-        bias_value = -math.log((1 - 0.01) / 0.01)
+        bias_value = -(math.log((1 - 0.01) / 0.01))
         torch.nn.init.constant_(self.cls_score.bias, bias_value)
 
     def forward(self, features):
