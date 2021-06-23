@@ -1,14 +1,14 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 import torch
 from torch.nn import functional as F
 
 from detectron2.structures import BoxMode, Instances
 
 from densepose.converters import ToChartResultConverter
-
-from ..structures import DensePoseDataRelative, DensePoseList
+from densepose.converters.base import IntTupleBox, make_int_box
+from densepose.structures import DensePoseDataRelative, DensePoseList
 
 
 class DensePoseBaseSampler:
@@ -36,9 +36,9 @@ class DensePoseBaseSampler:
         boxes_xyxy_abs = instances.pred_boxes.tensor.clone().cpu()
         boxes_xywh_abs = BoxMode.convert(boxes_xyxy_abs, BoxMode.XYXY_ABS, BoxMode.XYWH_ABS)
         dp_datas = []
-        for i, box_xywh in enumerate(boxes_xywh_abs):
-            annotation_i = self._sample(instances[i], box_xywh)
-            annotation_i[DensePoseDataRelative.S_KEY] = self._resample_mask(
+        for i in range(len(boxes_xywh_abs)):
+            annotation_i = self._sample(instances[i], make_int_box(boxes_xywh_abs[i]))
+            annotation_i[DensePoseDataRelative.S_KEY] = self._resample_mask(  # pyre-ignore[6]
                 instances[i].pred_densepose
             )
             dp_datas.append(DensePoseDataRelative(annotation_i))
@@ -46,7 +46,7 @@ class DensePoseBaseSampler:
         dp_list = DensePoseList(dp_datas, boxes_xyxy_abs, instances.image_size)
         return dp_list
 
-    def _sample(self, instance: Instances, bbox_xywh: List[int]) -> DensePoseDataRelative:
+    def _sample(self, instance: Instances, bbox_xywh: IntTupleBox) -> Dict[str, List[Any]]:
         """
         Sample DensPoseDataRelative from estimation results
         """
@@ -58,7 +58,6 @@ class DensePoseBaseSampler:
             DensePoseDataRelative.V_KEY: [],
             DensePoseDataRelative.I_KEY: [],
         }
-        x0, y0, _, _ = bbox_xywh
         n, h, w = dp_result.shape
         for part_id in range(1, DensePoseDataRelative.N_PART_LABELS + 1):
             # indices - tuple of 3 1D tensors of size k
@@ -109,7 +108,7 @@ class DensePoseBaseSampler:
         """
         raise NotImplementedError
 
-    def _produce_labels_and_results(self, instance: Instances) -> Tuple[torch.Tensor]:
+    def _produce_labels_and_results(self, instance: Instances) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Method to get labels and DensePose results from an instance
 

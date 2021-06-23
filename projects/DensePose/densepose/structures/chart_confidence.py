@@ -37,7 +37,7 @@ def decorate_predictor_output_class_with_confidences(BasePredictorOutput: type) 
 
     PredictorOutput = make_dataclass(
         BasePredictorOutput.__name__ + "WithConfidences",
-        fields=[
+        fields=[  # pyre-ignore[6]
             ("sigma_1", Optional[torch.Tensor], None),
             ("sigma_2", Optional[torch.Tensor], None),
             ("kappa_u", Optional[torch.Tensor], None),
@@ -77,7 +77,7 @@ def decorate_predictor_output_class_with_confidences(BasePredictorOutput: type) 
         Transfers all tensors to the given device
         """
         PredictorOutput = type(self)
-        base_predictor_output_to = super(PredictorOutput, self).to(device)
+        base_predictor_output_to = super(PredictorOutput, self).to(device)  # pyre-ignore[16]
 
         def to_device_if_tensor(var: Any):
             if isinstance(var, torch.Tensor):

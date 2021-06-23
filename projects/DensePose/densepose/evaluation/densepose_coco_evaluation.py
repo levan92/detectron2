@@ -30,8 +30,8 @@ from densepose.converters.segm_to_mask import (
     resample_coarse_segm_tensor_to_bbox,
     resample_fine_and_coarse_segm_tensors_to_bbox,
 )
-from densepose.data.structures import DensePoseDataRelative
 from densepose.modeling.cse.utils import squared_euclidean_distance_matrix
+from densepose.structures import DensePoseDataRelative
 from densepose.structures.mesh import create_mesh
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,6 @@ class DensePoseCocoEval(object):
         self.embedder = embedder
         self._dpEvalMode = dpEvalMode
         self._dpDataMode = dpDataMode
-        self.params = {}  # evaluation parameters
         self.evalImgs = defaultdict(list)  # per-image per-category eval results [KxAxI]
         self.eval = {}  # accumulated evaluation results
         self._gts = defaultdict(list)  # gt for evaluation
@@ -571,6 +570,7 @@ class DensePoseCocoEval(object):
             )
         else:
             raise Exception(f"No mask data in the detection: {dt}")
+        raise ValueError('The prediction dict needs to contain either "densepose" or "cse_mask"')
 
     def _extract_iuv(
         self, densepose_data: np.ndarray, py: np.ndarray, px: np.ndarray, gt: Dict[str, Any]

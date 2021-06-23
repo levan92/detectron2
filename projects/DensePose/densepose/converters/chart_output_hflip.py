@@ -2,8 +2,7 @@
 from dataclasses import fields
 import torch
 
-from ..data.structures import DensePoseTransformData
-from ..structures import DensePoseChartPredictorOutput
+from densepose.structures import DensePoseChartPredictorOutput, DensePoseTransformData
 
 
 def densepose_chart_predictor_output_hflip(
@@ -35,12 +34,14 @@ def densepose_chart_predictor_output_hflip(
             output_dict[field.name] = getattr(densepose_predictor_output, field.name)
 
         return PredictorOutput(**output_dict)
+    else:
+        return densepose_predictor_output
 
 
 def _flip_iuv_semantics_tensor(
     densepose_predictor_output: DensePoseChartPredictorOutput,
     dp_transform_data: DensePoseTransformData,
-) -> None:
+) -> DensePoseChartPredictorOutput:
     point_label_symmetries = dp_transform_data.point_label_symmetries
     uv_symmetries = dp_transform_data.uv_symmetries
 

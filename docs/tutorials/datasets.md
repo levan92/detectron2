@@ -33,10 +33,11 @@ data: List[Dict] = DatasetCatalog.get("my_dataset")
 ```
 
 Here, the snippet associates a dataset named "my_dataset" with a function that returns the data.
-The function must return the same data if called multiple times.
+The function must return the same data (with same order) if called multiple times.
 The registration stays effective until the process exits.
 
-The function can do arbitrary things and should return the data in either of the following formats:
+The function can do arbitrary things and should return the data in `list[dict]`, each dict in either
+of the following formats:
 1. Detectron2's standard dataset dict, described below. This will make it work with many other builtin
    features in detectron2, so it's recommended to use it when it's sufficient.
 2. Any custom format. You can also return arbitrary dicts in your own format,
@@ -89,7 +90,7 @@ and the required fields vary based on what the dataloader or the task needs (see
     The value num_categories is reserved to represent the "background" category, if applicable.
   + `segmentation` (list[list[float]] or dict): the segmentation mask of the instance.
     + If `list[list[float]]`, it represents a list of polygons, one for each connected component
-      of the object. Each `list[float]` is one simple polygon in the format of `[x1, y1, ..., xn, yn]`.
+      of the object. Each `list[float]` is one simple polygon in the format of `[x1, y1, ..., xn, yn]` (n≥3).
       The Xs and Ys are absolute coordinates in unit of pixels.
     + If `dict`, it represents the per-pixel segmentation mask in COCO's compressed RLE format.
       The dict should have keys "size" and "counts". You can convert a uint8 segmentation mask of 0s and

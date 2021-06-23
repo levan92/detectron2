@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from functools import reduce
 from operator import mul
-from typing import BinaryIO, Dict, Tuple
+from typing import BinaryIO, Dict, Optional, Tuple
 import torch
 
 from detectron2.utils.comm import gather, get_rank
@@ -150,7 +150,7 @@ class SingleProcessFileTensorStorage(SingleProcessTensorStorage):
             file_h = open(local_fpath, mode)
         else:
             raise ValueError(f"Unsupported file mode {mode}, supported modes: rb, wb")
-        super().__init__(data_schema, file_h)
+        super().__init__(data_schema, file_h)  # pyre-ignore[6]
 
 
 class SingleProcessRamTensorStorage(SingleProcessTensorStorage):
@@ -189,7 +189,7 @@ class MultiProcessFileTensorStorage(MultiProcessTensorStorage):
             rank: SingleProcessFileTensorStorage(data_schema, fpath, mode)
             for rank, fpath in rank_to_fpath.items()
         }
-        super().__init__(rank_to_storage)
+        super().__init__(rank_to_storage)  # pyre-ignore[6]
 
 
 class MultiProcessRamTensorStorage(MultiProcessTensorStorage):
@@ -198,12 +198,12 @@ class MultiProcessRamTensorStorage(MultiProcessTensorStorage):
             rank: SingleProcessRamTensorStorage(data_schema, buf)
             for rank, buf in rank_to_buffer.items()
         }
-        super().__init__(rank_to_storage)
+        super().__init__(rank_to_storage)  # pyre-ignore[6]
 
 
 def _ram_storage_gather(
     storage: SingleProcessRamTensorStorage, dst_rank: int = 0
-) -> MultiProcessRamTensorStorage:
+) -> Optional[MultiProcessRamTensorStorage]:
     storage.storage_impl.seek(0, os.SEEK_SET)
     # TODO: overhead, pickling a bytes object, can just pass bytes in a tensor directly
     # see detectron2/utils.comm.py
@@ -211,15 +211,15 @@ def _ram_storage_gather(
     if get_rank() != dst_rank:
         return None
     rank_to_buffer = {i: io.BytesIO(data_list[i]) for i in range(len(data_list))}
-    storage = MultiProcessRamTensorStorage(storage.data_schema, rank_to_buffer)
-    return storage
+    multiprocess_storage = MultiProcessRamTensorStorage(storage.data_schema, rank_to_buffer)
+    return multiprocess_storage
 
 
 def _file_storage_gather(
     storage: SingleProcessFileTensorStorage,
     dst_rank: int = 0,
     mode: str = "rb",
-) -> MultiProcessFileTensorStorage:
+) -> Optional[MultiProcessFileTensorStorage]:
     storage.storage_impl.close()
     fpath_list = gather(storage.fpath, dst=dst_rank)
     if get_rank() != dst_rank:
@@ -230,7 +230,7 @@ def _file_storage_gather(
 
 def storage_gather(
     storage: SingleProcessTensorStorage, dst_rank: int = 0
-) -> MultiProcessTensorStorage:
+) -> Optional[MultiProcessTensorStorage]:
     if isinstance(storage, SingleProcessRamTensorStorage):
         return _ram_storage_gather(storage, dst_rank)
     elif isinstance(storage, SingleProcessFileTensorStorage):

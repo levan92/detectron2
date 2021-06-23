@@ -97,6 +97,8 @@ install_linux_dep: &install_linux_dep
   - run:
       name: Install Dependencies
       command: |
+        # install from github to get latest; install iopath first since fvcore depends on it
+        pip install --progress-bar off -U 'git+https://github.com/facebookresearch/iopath'
         pip install --progress-bar off -U 'git+https://github.com/facebookresearch/fvcore'
         pip install --progress-bar off ninja opencv-python-headless pytest-xdist tensorboard pycocotools
         # install from pytorch's test wheels index to have access to RC wheels
@@ -141,14 +143,14 @@ jobs:
       # Refresh the key when dependencies should be updated (e.g. when pytorch releases)
       - restore_cache:
           keys:
-            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - <<: *install_linux_dep
 
       - save_cache:
           paths:
             - ~/venv
-          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - <<: *install_detectron2
       - <<: *run_unittests
@@ -165,7 +167,7 @@ jobs:
       # Cache the directory that contains python and dependencies
       - restore_cache:
           keys:
-            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - <<: *install_python
       - <<: *install_linux_dep
@@ -173,7 +175,7 @@ jobs:
       - save_cache:
           paths:
             - /opt/circleci/.pyenv
-          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - <<: *install_detectron2
       - <<: *run_unittests
@@ -189,7 +191,7 @@ jobs:
       # Cache the env directory that contains dependencies
       - restore_cache:
           keys:
-            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+            - cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - run:
           name: Install Dependencies
@@ -197,13 +199,14 @@ jobs:
             pip install certifi --ignore-installed  # required on windows to workaround some cert issue
             pip install numpy cython  # required on windows before pycocotools
             pip install opencv-python-headless pytest-xdist pycocotools tensorboard
+            pip install -U git+https://github.com/facebookresearch/iopath
             pip install -U git+https://github.com/facebookresearch/fvcore
             pip install torch==$env:PYTORCH_VERSION torchvision==$env:TORCHVISION_VERSION -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
       - save_cache:
           paths:
             - env
-          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210304
+          key: cache-{{ arch }}-<< parameters.pytorch_version >>-{{ .Branch }}-20210404
 
       - <<: *install_detectron2
       # TODO: unittest fails for now

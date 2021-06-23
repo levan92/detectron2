@@ -77,7 +77,7 @@ class DensePoseConfidenceBasedSampler(DensePoseBaseSampler):
             # (here best = smallest variance)
             _, sorted_confidence_indices = torch.sort(values[2])
             if self.search_count_multiplier is not None:
-                search_count = min(int(count * self.search_count_multiplier), k)
+                search_count = min(int(count * self.search_count_multiplier), k)  # pyre-ignore[58]
             elif self.search_proportion is not None:
                 search_count = min(max(int(k * self.search_proportion), count), k)
             else:
@@ -86,7 +86,7 @@ class DensePoseConfidenceBasedSampler(DensePoseBaseSampler):
             index_sample = sorted_confidence_indices[:search_count][sample_from_top]
         return index_sample
 
-    def _produce_labels_and_results(self, instance) -> Tuple[torch.Tensor]:
+    def _produce_labels_and_results(self, instance) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Method to get labels and DensePose results from an instance, with confidences
 

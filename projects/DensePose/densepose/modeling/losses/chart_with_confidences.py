@@ -16,7 +16,7 @@ from .utils import BilinearInterpolationHelper, LossDict
 
 @DENSEPOSE_LOSS_REGISTRY.register()
 class DensePoseChartWithConfidenceLoss(DensePoseChartLoss):
-    """"""
+    """ """
 
     def __init__(self, cfg: CfgNode):
         super().__init__(cfg)
@@ -107,14 +107,13 @@ class DensePoseChartWithConfidenceLoss(DensePoseChartLoss):
                         * self.w_points
                     )
                 }
-        else:
-            return super().produce_densepose_losses_uv(
-                proposals_with_gt,
-                densepose_predictor_outputs,
-                packed_annotations,
-                interpolator,
-                j_valid_fg,
-            )
+        return super().produce_densepose_losses_uv(
+            proposals_with_gt,
+            densepose_predictor_outputs,
+            packed_annotations,
+            interpolator,
+            j_valid_fg,
+        )
 
 
 class IIDIsotropicGaussianUVLoss(nn.Module):
@@ -203,4 +202,4 @@ class IndepAnisotropicGaussianUVLoss(nn.Module):
         loss = 0.5 * (
             self.log2pi + torch.log(denom2) + delta_sqnorm / sigma2 - delta_r_sqnorm / denom2
         )
-        return loss.sum()
+        return loss.sum()  # pyre-ignore[16]

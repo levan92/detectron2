@@ -3,7 +3,8 @@ import numpy as np
 from typing import Optional, Tuple
 import cv2
 
-from ..data.structures import DensePoseDataRelative
+from densepose.structures import DensePoseDataRelative
+
 from ..structures import DensePoseChartPredictorOutput
 from .base import Boxes, Image, MatrixVisualizer
 
@@ -28,9 +29,9 @@ class DensePoseOutputsVisualizer(object):
         image_bgr: Image,
         dp_output_with_bboxes: Tuple[Optional[DensePoseChartPredictorOutput], Optional[Boxes]],
     ) -> Image:
-        if dp_output_with_bboxes[0] is None:
-            return image_bgr
         densepose_output, bboxes_xywh = dp_output_with_bboxes
+        if densepose_output is None or bboxes_xywh is None:
+            return image_bgr
 
         assert isinstance(
             densepose_output, DensePoseChartPredictorOutput

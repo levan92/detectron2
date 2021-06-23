@@ -67,22 +67,26 @@ class EmbeddingLoss:
             dict(int -> tensor): losses for different mesh IDs
         """
         losses = {}
-        for mesh_id_tensor in packed_annotations.vertex_mesh_ids_gt.unique():
+        for mesh_id_tensor in packed_annotations.vertex_mesh_ids_gt.unique():  # pyre-ignore[16]
             mesh_id = mesh_id_tensor.item()
             mesh_name = MeshCatalog.get_mesh_name(mesh_id)
             # valid points are those that fall into estimated bbox
             # and correspond to the current mesh
-            j_valid = interpolator.j_valid * (packed_annotations.vertex_mesh_ids_gt == mesh_id)
+            j_valid = interpolator.j_valid * (  # pyre-ignore[16]
+                packed_annotations.vertex_mesh_ids_gt == mesh_id
+            )
+            if not torch.any(j_valid):
+                continue
             # extract estimated embeddings for valid points
             # -> tensor [J, D]
             vertex_embeddings_i = normalize_embeddings(
                 interpolator.extract_at_points(
                     densepose_predictor_outputs.embedding,
                     slice_fine_segm=slice(None),
-                    w_ylo_xlo=interpolator.w_ylo_xlo[:, None],
-                    w_ylo_xhi=interpolator.w_ylo_xhi[:, None],
-                    w_yhi_xlo=interpolator.w_yhi_xlo[:, None],
-                    w_yhi_xhi=interpolator.w_yhi_xhi[:, None],
+                    w_ylo_xlo=interpolator.w_ylo_xlo[:, None],  # pyre-ignore[16]
+                    w_ylo_xhi=interpolator.w_ylo_xhi[:, None],  # pyre-ignore[16]
+                    w_yhi_xlo=interpolator.w_yhi_xlo[:, None],  # pyre-ignore[16]
+                    w_yhi_xhi=interpolator.w_yhi_xhi[:, None],  # pyre-ignore[16]
                 )[j_valid, :]
             )
             # extract vertex ids for valid points
@@ -98,6 +102,10 @@ class EmbeddingLoss:
             ) / (-self.embdist_gauss_sigma)
             losses[mesh_name] = F.cross_entropy(scores, vertex_indices_i, ignore_index=-1)
 
+        # pyre-fixme[29]:
+        #  `Union[BoundMethod[typing.Callable(torch.Tensor.__iter__)[[Named(self,
+        #  torch.Tensor)], typing.Iterator[typing.Any]], torch.Tensor], nn.Module,
+        #  torch.Tensor]` is not a function.
         for mesh_name in embedder.mesh_names:
             if mesh_name not in losses:
                 losses[mesh_name] = self.fake_value(
@@ -107,6 +115,10 @@ class EmbeddingLoss:
 
     def fake_values(self, densepose_predictor_outputs: Any, embedder: nn.Module):
         losses = {}
+        # pyre-fixme[29]:
+        #  `Union[BoundMethod[typing.Callable(torch.Tensor.__iter__)[[Named(self,
+        #  torch.Tensor)], typing.Iterator[typing.Any]], torch.Tensor], nn.Module,
+        #  torch.Tensor]` is not a function.
         for mesh_name in embedder.mesh_names:
             losses[mesh_name] = self.fake_value(densepose_predictor_outputs, embedder, mesh_name)
         return losses

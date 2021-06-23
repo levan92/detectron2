@@ -10,8 +10,8 @@ from torch import Tensor, nn
 from detectron2 import model_zoo
 from detectron2.config import get_cfg
 from detectron2.config.instantiate import dump_dataclass, instantiate
+from detectron2.export import dump_torchscript_IR, scripting_with_instances
 from detectron2.export.flatten import TracingAdapter, flatten_to_tuple
-from detectron2.export.torchscript import dump_torchscript_IR, export_torchscript_with_instances
 from detectron2.export.torchscript_patch import patch_builtin_len
 from detectron2.layers import ShapeSpec
 from detectron2.modeling import build_backbone
@@ -37,10 +37,12 @@ contains some explanations of this file.
 class TestScripting(unittest.TestCase):
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testMaskRCNN(self):
+        # TODO: this test requires manifold access, see: T88318502
         self._test_rcnn_model("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testRetinaNet(self):
+        # TODO: this test requires manifold access, see: T88318502
         self._test_retinanet_model("COCO-Detection/retinanet_R_50_FPN_3x.yaml")
 
     def _test_rcnn_model(self, config_path):
@@ -55,9 +57,9 @@ class TestScripting(unittest.TestCase):
             "pred_classes": Tensor,
             "pred_masks": Tensor,
         }
-        script_model = export_torchscript_with_instances(model, fields)
+        script_model = scripting_with_instances(model, fields)
 
-        inputs = [{"image": get_sample_coco_image()}]
+        inputs = [{"image": get_sample_coco_image()}] * 2
         with torch.no_grad():
             instance = model.inference(inputs, do_postprocess=False)[0]
             scripted_instance = script_model.inference(inputs, do_postprocess=False)[0]
@@ -72,10 +74,10 @@ class TestScripting(unittest.TestCase):
             "scores": Tensor,
             "pred_classes": Tensor,
         }
-        script_model = export_torchscript_with_instances(model, fields)
+        script_model = scripting_with_instances(model, fields)
 
         img = get_sample_coco_image()
-        inputs = [{"image": img}]
+        inputs = [{"image": img}] * 2
         with torch.no_grad():
             instance = model(inputs)[0]["instances"]
             scripted_instance = convert_scripted_instances(script_model(inputs)[0])
@@ -89,6 +91,7 @@ class TestScripting(unittest.TestCase):
 class TestTracing(unittest.TestCase):
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testMaskRCNN(self):
+        # TODO: this test requires manifold access, see: T88318502
         def inference_func(model, image):
             inputs = [{"image": image}]
             return model.inference(inputs, do_postprocess=False)[0]
@@ -97,6 +100,7 @@ class TestTracing(unittest.TestCase):
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testRetinaNet(self):
+        # TODO: this test requires manifold access, see: T88318502
         def inference_func(model, image):
             return model.forward([{"image": image}])[0]["instances"]
 
@@ -174,6 +178,21 @@ class TestTorchscriptUtils(unittest.TestCase):
             dump_torchscript_IR(ts_model, d)
             # check that the files are created
             for name in ["model_ts_code", "model_ts_IR", "model_ts_IR_inlined", "model"]:
+                fname = os.path.join(d, name + ".txt")
+                self.assertTrue(os.stat(fname).st_size > 0, fname)
+
+    def test_dump_IR_function(self):
+        @torch.jit.script
+        def gunc(x, y):
+            return x + y
+
+        def func(x, y):
+            return x + y + gunc(x, y)
+
+        ts_model = torch.jit.trace(func, (torch.rand(3), torch.rand(3)))
+        with tempfile.TemporaryDirectory(prefix="detectron2_test") as d:
+            dump_torchscript_IR(ts_model, d)
+            for name in ["model_ts_code", "model_ts_IR", "model_ts_IR_inlined"]:
                 fname = os.path.join(d, name + ".txt")
                 self.assertTrue(os.stat(fname).st_size > 0, fname)
 

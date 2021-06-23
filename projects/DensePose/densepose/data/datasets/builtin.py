@@ -13,4 +13,4 @@ register_coco_datasets(COCO_DATASETS, DEFAULT_DATASETS_ROOT)
 register_coco_datasets(BASE_COCO_DATASETS, DEFAULT_DATASETS_ROOT)
 register_lvis_datasets(LVIS_DATASETS, DEFAULT_DATASETS_ROOT)
 
-register_chimpnsee_dataset(DEFAULT_DATASETS_ROOT)
+register_chimpnsee_dataset(DEFAULT_DATASETS_ROOT)  # pyre-ignore[19]

@@ -10,6 +10,14 @@ from detectron2.utils.file_io import PathManager
 from densepose.data.meshes.catalog import MeshCatalog, MeshInfo
 
 
+def _maybe_copy_to_device(
+    attribute: Optional[torch.Tensor], device: torch.device
+) -> Optional[torch.Tensor]:
+    if attribute is None:
+        return None
+    return attribute.to(device)
+
+
 class Mesh:
     def __init__(
         self,
@@ -56,27 +64,28 @@ class Mesh:
                 if field is not None:
                     self.device = field.device
                     break
-            if self.device is None and self._symmetry is not None:
-                for key in self._symmetry:
-                    self.device = self._symmetry[key].device
+            if self.device is None and symmetry is not None:
+                for key in symmetry:
+                    self.device = symmetry[key].device
                     break
             self.device = torch.device("cpu") if self.device is None else self.device
 
         assert all([var.device == self.device for var in all_fields if var is not None])
-        assert symmetry is None or all(
-            self._symmetry[key].device == self.device for key in self._symmetry
-        )
-        assert texcoords is None or vertices is None or len(self._vertices) == len(self._texcoords)
+        if symmetry:
+            assert all(symmetry[key].device == self.device for key in symmetry)
+        if texcoords and vertices:
+            assert len(vertices) == len(texcoords)
 
     def to(self, device: torch.device):
+        device_symmetry = self._symmetry
+        if device_symmetry:
+            device_symmetry = {key: value.to(device) for key, value in device_symmetry.items()}
         return Mesh(
-            self._vertices.to(device) if self._vertices is not None else None,
-            self._faces.to(device) if self._faces is not None else None,
-            self._geodists.to(device) if self._geodists is not None else None,
-            {key: value.to(device) for key, value in self._symmetry.items()}
-            if self._symmetry is not None
-            else None,
-            self._texcoords.to(device) if self._texcoords is not None else None,
+            _maybe_copy_to_device(self._vertices, device),
+            _maybe_copy_to_device(self._faces, device),
+            _maybe_copy_to_device(self._geodists, device),
+            device_symmetry,
+            _maybe_copy_to_device(self._texcoords, device),
             self.mesh_info,
             device,
         )
@@ -126,7 +135,9 @@ def load_mesh_data(
     mesh_fpath: str, field: str, device: Optional[torch.device] = None
 ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
     with PathManager.open(mesh_fpath, "rb") as hFile:
-        return torch.as_tensor(pickle.load(hFile)[field], dtype=torch.float).to(device)
+        return torch.as_tensor(pickle.load(hFile)[field], dtype=torch.float).to(  # pyre-ignore[6]
+            device
+        )
     return None
 
 
@@ -135,7 +146,7 @@ def load_mesh_auxiliary_data(
 ) -> Optional[torch.Tensor]:
     fpath_local = PathManager.get_local_path(fpath)
     with PathManager.open(fpath_local, "rb") as hFile:
-        return torch.as_tensor(pickle.load(hFile), dtype=torch.float).to(device)
+        return torch.as_tensor(pickle.load(hFile), dtype=torch.float).to(device)  # pyre-ignore[6]
     return None
 
 
@@ -144,7 +155,7 @@ def load_mesh_symmetry(
     symmetry_fpath: str, device: Optional[torch.device] = None
 ) -> Optional[Dict[str, torch.Tensor]]:
     with PathManager.open(symmetry_fpath, "rb") as hFile:
-        symmetry_loaded = pickle.load(hFile)
+        symmetry_loaded = pickle.load(hFile)  # pyre-ignore[6]
         symmetry = {
             "vertex_transforms": torch.as_tensor(
                 symmetry_loaded["vertex_transforms"], dtype=torch.long
@@ -155,5 +166,5 @@ def load_mesh_symmetry(
 
 
 @lru_cache()
-def create_mesh(mesh_name: str, device: torch.device = None):
+def create_mesh(mesh_name: str, device: Optional[torch.device] = None):
     return Mesh(mesh_info=MeshCatalog[mesh_name], device=device)

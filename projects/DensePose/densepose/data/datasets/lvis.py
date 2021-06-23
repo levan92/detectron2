@@ -19,22 +19,27 @@ from .coco import (
 
 DATASETS = [
     CocoDatasetInfo(
-        name="densepose_lvis_v1_train1",
+        name="densepose_lvis_v1_ds1_train_v1",
         images_root="coco_",
-        annotations_fpath="lvis/densepose_lvis_v1_train1_v2.json",
+        annotations_fpath="lvis/densepose_lvis_v1_ds1_train_v1.json",
     ),
     CocoDatasetInfo(
-        name="densepose_lvis_v1_train2",
+        name="densepose_lvis_v1_ds1_val_v1",
         images_root="coco_",
-        annotations_fpath="lvis/densepose_lvis_v1_train2_v2.json",
+        annotations_fpath="lvis/densepose_lvis_v1_ds1_val_v1.json",
     ),
     CocoDatasetInfo(
-        name="densepose_lvis_v1_val",
+        name="densepose_lvis_v1_ds2_train_v1",
         images_root="coco_",
-        annotations_fpath="lvis/densepose_lvis_v1_val_v2.json",
+        annotations_fpath="lvis/densepose_lvis_v1_ds2_train_v1.json",
     ),
     CocoDatasetInfo(
-        name="densepose_lvis_v1_val_animals_100",
+        name="densepose_lvis_v1_ds2_val_v1",
+        images_root="coco_",
+        annotations_fpath="lvis/densepose_lvis_v1_ds2_val_v1.json",
+    ),
+    CocoDatasetInfo(
+        name="densepose_lvis_v1_ds1_val_animals_100",
         images_root="coco_",
         annotations_fpath="lvis/densepose_lvis_v1_val_animals_100_v2.json",
     ),
@@ -207,14 +212,14 @@ def load_lvis_json(annotations_json_file: str, image_root: str, dataset_name: st
     return dataset_records
 
 
-def register_dataset(dataset_data: CocoDatasetInfo, datasets_root: Optional[os.PathLike] = None):
+def register_dataset(dataset_data: CocoDatasetInfo, datasets_root: Optional[str] = None):
     """
     Registers provided LVIS DensePose dataset
 
     Args:
         dataset_data: CocoDatasetInfo
             Dataset data
-        datasets_root: Optional[os.PathLike]
+        datasets_root: Optional[str]
             Datasets root folder (default: None)
     """
     annotations_fpath = maybe_prepend_base_path(datasets_root, dataset_data.annotations_fpath)
@@ -237,7 +242,7 @@ def register_dataset(dataset_data: CocoDatasetInfo, datasets_root: Optional[os.P
 
 
 def register_datasets(
-    datasets_data: Iterable[CocoDatasetInfo], datasets_root: Optional[os.PathLike] = None
+    datasets_data: Iterable[CocoDatasetInfo], datasets_root: Optional[str] = None
 ):
     """
     Registers provided LVIS DensePose datasets
@@ -245,7 +250,7 @@ def register_datasets(
     Args:
         datasets_data: Iterable[CocoDatasetInfo]
             An iterable of dataset datas
-        datasets_root: Optional[os.PathLike]
+        datasets_root: Optional[str]
             Datasets root folder (default: None)
     """
     for dataset_data in datasets_data:

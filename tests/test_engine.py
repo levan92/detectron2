@@ -5,7 +5,9 @@ import os
 import tempfile
 import time
 import unittest
+from unittest import mock
 import torch
+from fvcore.common.checkpoint import Checkpointer
 from torch import nn
 
 from detectron2.config import configurable, get_cfg
@@ -82,7 +84,9 @@ class TestTrainer(unittest.TestCase):
 
     @unittest.skipIf(os.environ.get("CI"), "Require COCO data.")
     def test_default_trainer(self):
+        # TODO: this test requires manifold access, so changed device to CPU. see: T88318502
         cfg = get_cfg()
+        cfg.MODEL.DEVICE = "cpu"
         cfg.MODEL.META_ARCHITECTURE = "_SimpleModel"
         cfg.DATASETS.TRAIN = ("coco_2017_val_100",)
         with tempfile.TemporaryDirectory(prefix="detectron2_test") as d:
@@ -93,3 +97,53 @@ class TestTrainer(unittest.TestCase):
             self.assertIs(trainer.model, trainer._trainer.model)
             trainer.model = _SimpleModel()
             self.assertIs(trainer.model, trainer._trainer.model)
+
+    def test_checkpoint_resume(self):
+        model = _SimpleModel()
+        dataloader = self._data_loader("cpu")
+        opt = torch.optim.SGD(model.parameters(), 0.1)
+        scheduler = torch.optim.lr_scheduler.StepLR(opt, 3)
+
+        with tempfile.TemporaryDirectory(prefix="detectron2_test") as d:
+            trainer = SimpleTrainer(model, dataloader, opt)
+            checkpointer = Checkpointer(model, d, opt=opt, trainer=trainer)
+
+            trainer.register_hooks(
+                [
+                    hooks.LRScheduler(scheduler=scheduler),
+                    # checkpoint after scheduler to properly save the state of scheduler
+                    hooks.PeriodicCheckpointer(checkpointer, 10),
+                ]
+            )
+
+            trainer.train(0, 12)
+            self.assertAlmostEqual(opt.param_groups[0]["lr"], 1e-5)
+            self.assertEqual(scheduler.last_epoch, 12)
+            del trainer
+
+            opt = torch.optim.SGD(model.parameters(), 999)  # lr will be loaded
+            trainer = SimpleTrainer(model, dataloader, opt)
+            scheduler = torch.optim.lr_scheduler.StepLR(opt, 3)
+            trainer.register_hooks(
+                [
+                    hooks.LRScheduler(scheduler=scheduler),
+                ]
+            )
+            checkpointer = Checkpointer(model, d, opt=opt, trainer=trainer)
+            checkpointer.resume_or_load("non_exist.pth")
+            self.assertEqual(trainer.iter, 11)  # last finished iter number (0-based in Trainer)
+            # number of times `scheduler.step()` was called (1-based)
+            self.assertEqual(scheduler.last_epoch, 12)
+            self.assertAlmostEqual(opt.param_groups[0]["lr"], 1e-5)
+
+    def test_eval_hook(self):
+        model = _SimpleModel()
+        dataloader = self._data_loader("cpu")
+        opt = torch.optim.SGD(model.parameters(), 0.1)
+
+        for total_iter, period, eval_count in [(30, 15, 2), (31, 15, 3), (20, 0, 1)]:
+            test_func = mock.Mock(return_value={"metric": 3.0})
+            trainer = SimpleTrainer(model, dataloader, opt)
+            trainer.register_hooks([hooks.EvalHook(period, test_func)])
+            trainer.train(0, total_iter)
+            self.assertEqual(test_func.call_count, eval_count)

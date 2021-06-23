@@ -49,9 +49,9 @@ class TrainingSampler(Sampler):
         g.manual_seed(self._seed)
         while True:
             if self._shuffle:
-                yield from torch.randperm(self._size, generator=g)
+                yield from torch.randperm(self._size, generator=g).tolist()
             else:
-                yield from torch.arange(self._size)
+                yield from torch.arange(self._size).tolist()
 
 
 class RepeatFactorTrainingSampler(Sampler):
@@ -99,8 +99,8 @@ class RepeatFactorTrainingSampler(Sampler):
                 repeated twice.
 
         Returns:
-            torch.Tensor: the i-th element is the repeat factor for the dataset image
-                at index i.
+            torch.Tensor:
+                the i-th element is the repeat factor for the dataset image at index i.
         """
         # 1. For each category c, compute the fraction of images that contain it: f(c)
         category_freq = defaultdict(int)
@@ -165,14 +165,14 @@ class RepeatFactorTrainingSampler(Sampler):
             indices = self._get_epoch_indices(g)
             if self._shuffle:
                 randperm = torch.randperm(len(indices), generator=g)
-                yield from indices[randperm]
+                yield from indices[randperm].tolist()
             else:
-                yield from indices
+                yield from indices.tolist()
 
 
 class InferenceSampler(Sampler):
     """
-    Produce indices for inference.
+    Produce indices for inference across all workers.
     Inference needs to run on the __exact__ set of samples,
     therefore when the total number of samples is not divisible by the number of workers,
     this sampler produces different number of samples on different workers.

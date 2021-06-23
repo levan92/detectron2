@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from detectron2.structures import Instances
 
@@ -38,7 +38,7 @@ class PredictionToGroundTruthSampler:
         # delete scores
         self.register_sampler("scores")
 
-    def __call__(self, model_output: ModelOutput) -> SampledData:
+    def __call__(self, model_output: List[ModelOutput]) -> List[SampledData]:
         """
         Transform model output into ground truth data through sampling
 

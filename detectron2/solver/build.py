@@ -141,7 +141,7 @@ def get_default_optimizer_params(
 ):
     """
     Get default param list for optimizer, with support for a few types of
-    overrides. If not overrides needed, this is equivalent to `model.parameters()`.
+    overrides. If no overrides needed, this is equivalent to `model.parameters()`.
 
     Args:
         base_lr: lr for every group by default. Can be omitted to use the one in optimizer.
@@ -150,18 +150,16 @@ def get_default_optimizer_params(
         weight_decay_norm: override weight decay for params in normalization layers
         bias_lr_factor: multiplier of lr for bias parameters.
         weight_decay_bias: override weight decay for bias parameters
-        overrides (dict: str -> (dict: str -> float)):
-            if not `None`, provides values for optimizer hyperparameters
+        overrides: if not `None`, provides values for optimizer hyperparameters
             (LR, weight decay) for module parameters with a given name; e.g.
-            {"embedding": {"lr": 0.01, "weight_decay": 0.1}} will set the LR and
-            weight decay values for all module parameters named `embedding` (default: None)
+            ``{"embedding": {"lr": 0.01, "weight_decay": 0.1}}`` will set the LR and
+            weight decay values for all module parameters named `embedding`.
 
     For common detection models, ``weight_decay_norm`` is the only option
     needed to be set. ``bias_lr_factor,weight_decay_bias`` are legacy settings
     from Detectron1 that are not found useful.
 
     Example:
-
     ::
         torch.optim.SGD(get_default_optimizer_params(model, weight_decay_norm=0),
                        lr=0.01, weight_decay=1e-4, momentum=0.9)
@@ -248,7 +246,7 @@ def build_lr_scheduler(
     sched = WarmupParamScheduler(
         sched,
         cfg.SOLVER.WARMUP_FACTOR,
-        cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER,
+        min(cfg.SOLVER.WARMUP_ITERS / cfg.SOLVER.MAX_ITER, 1.0),
         cfg.SOLVER.WARMUP_METHOD,
     )
     return LRMultiplier(optimizer, multiplier=sched, max_iter=cfg.SOLVER.MAX_ITER)

@@ -1,5 +1,6 @@
 # -*- coding = utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates.
+# pyre-ignore-all-errors
 
 from detectron2.config import CfgNode as CN
 
@@ -38,10 +39,16 @@ def add_evaluation_config(cfg: CN):
     # minimum threshold for IOU values: the lower its values is,
     # the more matches are produced (and the higher the AP score)
     _C.DENSEPOSE_EVALUATION.MIN_IOU_THRESHOLD = 0.5
+    # Non-distributed inference is slower (at inference time) but can avoid RAM OOM
+    _C.DENSEPOSE_EVALUATION.DISTRIBUTED_INFERENCE = True
+    # evaluate mesh alignment based on vertex embeddings, only makes sense in CSE context
+    _C.DENSEPOSE_EVALUATION.EVALUATE_MESH_ALIGNMENT = False
+    # meshes to compute mesh alignment for
+    _C.DENSEPOSE_EVALUATION.MESH_ALIGNMENT_MESH_NAMES = []
 
 
 def add_bootstrap_config(cfg: CN):
-    """"""
+    """ """
     _C = cfg
     _C.BOOTSTRAP_DATASETS = []
     _C.BOOTSTRAP_MODEL = CN()
@@ -59,6 +66,9 @@ def get_bootstrap_dataset_config() -> CN:
     _C.IMAGE_LOADER.TYPE = ""
     _C.IMAGE_LOADER.BATCH_SIZE = 4
     _C.IMAGE_LOADER.NUM_WORKERS = 4
+    _C.IMAGE_LOADER.CATEGORIES = []
+    _C.IMAGE_LOADER.MAX_COUNT_PER_CATEGORY = 1_000_000
+    _C.IMAGE_LOADER.CATEGORY_TO_CLASS_MAPPING = CN(new_allowed=True)
     # inference
     _C.INFERENCE = CN()
     # batch size for model inputs
@@ -68,6 +78,7 @@ def get_bootstrap_dataset_config() -> CN:
     # sampled data
     _C.DATA_SAMPLER = CN(new_allowed=True)
     _C.DATA_SAMPLER.TYPE = ""
+    _C.DATA_SAMPLER.USE_GROUND_TRUTH_CATEGORIES = False
     # filter
     _C.FILTER = CN(new_allowed=True)
     _C.FILTER.TYPE = ""
@@ -115,6 +126,33 @@ def add_densepose_head_cse_config(cfg: CN):
     # optimizer hyperparameters
     _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.FEATURES_LR_FACTOR = 1.0
     _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.EMBEDDING_LR_FACTOR = 1.0
+    # Shape to shape cycle consistency loss parameters:
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.SHAPE_TO_SHAPE_CYCLE_LOSS = CN({"ENABLED": False})
+    # shape to shape cycle consistency loss weight
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.SHAPE_TO_SHAPE_CYCLE_LOSS.WEIGHT = 0.025
+    # norm type used for loss computation
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.SHAPE_TO_SHAPE_CYCLE_LOSS.NORM_P = 2
+    # normalization term for embedding similarity matrices
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.SHAPE_TO_SHAPE_CYCLE_LOSS.TEMPERATURE = 0.05
+    # maximum number of vertices to include into shape to shape cycle loss
+    # if negative or zero, all vertices are considered
+    # if positive, random subset of vertices of given size is considered
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.SHAPE_TO_SHAPE_CYCLE_LOSS.MAX_NUM_VERTICES = 4936
+    # Pixel to shape cycle consistency loss parameters:
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS = CN({"ENABLED": False})
+    # pixel to shape cycle consistency loss weight
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.WEIGHT = 0.0001
+    # norm type used for loss computation
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.NORM_P = 2
+    # map images to all meshes and back (if false, use only gt meshes from the batch)
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.USE_ALL_MESHES_NOT_GT_ONLY = False
+    # Randomly select at most this number of pixels from every instance
+    # if negative or zero, all vertices are considered
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.NUM_PIXELS_TO_SAMPLE = 100
+    # normalization factor for pixel to pixel distances (higher value = smoother distribution)
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.PIXEL_SIGMA = 5.0
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.TEMPERATURE_PIXEL_TO_VERTEX = 0.05
+    _C.MODEL.ROI_DENSEPOSE_HEAD.CSE.PIX_TO_SHAPE_CYCLE_LOSS.TEMPERATURE_VERTEX_TO_PIXEL = 0.05
 
 
 def add_densepose_head_config(cfg: CN):
@@ -164,6 +202,8 @@ def add_densepose_head_config(cfg: CN):
     #   "DensePoseChartPredictor": predicts segmentation and UV coordinates for predefined charts
     #   "DensePoseChartWithConfidencePredictor": predicts segmentation, UV coordinates
     #       and associated confidences for predefined charts (default)
+    #   "DensePoseEmbeddingWithConfidencePredictor": predicts segmentation, embeddings
+    #       and associated confidences for CSE
     _C.MODEL.ROI_DENSEPOSE_HEAD.PREDICTOR_NAME = "DensePoseChartWithConfidencePredictor"
     # Loss class name, must be registered in DENSEPOSE_LOSS_REGISTRY
     # Some registered losses:

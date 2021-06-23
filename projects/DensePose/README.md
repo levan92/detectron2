@@ -23,7 +23,7 @@ of the method, links to trained models along with their performance evaluation i
 ## [Continuous Surface Embeddings for Dense Pose Estimation for Humans and Animals](doc/DENSEPOSE_CSE.md)
 
 <div align="center">
-  <img src="https://dl.fbaipublicfiles.com/densepose/web/densepose_cse_teaser.gif" width="700px" />
+  <img src="https://dl.fbaipublicfiles.com/densepose/web/densepose_cse_teaser.png" width="700px" />
 </div>
 
 To establish continuous surface embeddings, the model simultaneously learns
@@ -47,6 +47,7 @@ and for [continuous surface embeddings model zoo](doc/DENSEPOSE_CSE.md#ModelZoo)
 
 # What's New
 
+* June 2021: [DensePose CSE with Cycle Losses](doc/RELEASE_2021_06.md)
 * March 2021: [DensePose CSE (a framework to extend DensePose to various categories using 3D models)
   and DensePose Evolution (a framework to bootstrap DensePose on unlabeled data) released](doc/RELEASE_2021_03.md)
 * April 2020: [DensePose Confidence Estimation and Model Zoo Improvements](doc/RELEASE_2020_04.md)

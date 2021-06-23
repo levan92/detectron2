@@ -143,7 +143,7 @@ class ROIHeads(torch.nn.Module):
         batch_size_per_image,
         positive_fraction,
         proposal_matcher,
-        proposal_append_gt=True
+        proposal_append_gt=True,
     ):
         """
         NOTE: this interface is experimental.
@@ -243,7 +243,6 @@ class ROIHeads(torch.nn.Module):
 
                 Other fields such as "gt_classes", "gt_masks", that's included in `targets`.
         """
-        gt_boxes = [x.gt_boxes for x in targets]
         # Augment proposals with ground-truth boxes.
         # In the case of learned proposals (e.g., RPN), when training starts
         # the proposals will be low quality due to random initialization.
@@ -256,7 +255,7 @@ class ROIHeads(torch.nn.Module):
         # convergence and empirically improves box AP on COCO by about 0.5
         # points (under one tested configuration).
         if self.proposal_append_gt:
-            proposals = add_ground_truth_to_proposals(gt_boxes, proposals)
+            proposals = add_ground_truth_to_proposals(targets, proposals)
 
         proposals_with_gt = []
 
@@ -357,7 +356,7 @@ class Res5ROIHeads(ROIHeads):
         res5: nn.Module,
         box_predictor: nn.Module,
         mask_head: Optional[nn.Module] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         NOTE: this interface is experimental.
@@ -547,7 +546,7 @@ class StandardROIHeads(ROIHeads):
         keypoint_pooler: Optional[ROIPooler] = None,
         keypoint_head: Optional[nn.Module] = None,
         train_on_pred_boxes: bool = False,
-        **kwargs
+        **kwargs,
     ):
         """
         NOTE: this interface is experimental.
@@ -759,7 +758,7 @@ class StandardROIHeads(ROIHeads):
                 "pred_boxes" and "pred_classes" to exist.
 
         Returns:
-            instances (list[Instances]):
+            list[Instances]:
                 the same `Instances` objects, with extra
                 fields such as `pred_masks` or `pred_keypoints`.
         """
@@ -866,5 +865,5 @@ class StandardROIHeads(ROIHeads):
             boxes = [x.proposal_boxes if self.training else x.pred_boxes for x in instances]
             features = self.keypoint_pooler(features, boxes)
         else:
-            features = dict([(f, features[f]) for f in self.keypoint_in_features])
+            features = {f: features[f] for f in self.keypoint_in_features}
         return self.keypoint_head(features, instances)

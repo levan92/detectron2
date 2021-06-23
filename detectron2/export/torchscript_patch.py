@@ -11,7 +11,7 @@ from torch import nn
 
 # need some explicit imports due to https://github.com/pytorch/pytorch/issues/38964
 import detectron2  # noqa F401
-from detectron2.structures import Instances
+from detectron2.structures import Boxes, Instances
 from detectron2.utils.env import _import_file
 
 _counter = 0
@@ -52,7 +52,7 @@ def patch_instances(fields):
     """
     A contextmanager, under which the Instances class in detectron2 is replaced
     by a statically-typed scriptable class, defined by `fields`.
-    See more in `export_torchscript_with_instances`.
+    See more in `scripting_with_instances`.
     """
 
     with tempfile.TemporaryDirectory(prefix="detectron2") as dir, tempfile.NamedTemporaryFile(
@@ -228,6 +228,32 @@ class {cls_name}:
         """
         return ret
 """
+    )
+
+    # support method `get_fields()`
+    lines.append(
+        """
+    def get_fields(self) -> Dict[str, Tensor]:
+        ret = {}
+    """
+    )
+    for f in fields:
+        if f.type_ == Boxes:
+            stmt = "t.tensor"
+        elif f.type_ == torch.Tensor:
+            stmt = "t"
+        else:
+            stmt = f'assert False, "unsupported type {str(f.type_)}"'
+        lines.append(
+            f"""
+        t = self._{f.name}
+        if t is not None:
+            ret["{f.name}"] = {stmt}
+        """
+        )
+    lines.append(
+        """
+        return ret"""
     )
     return cls_name, os.linesep.join(lines)
 
