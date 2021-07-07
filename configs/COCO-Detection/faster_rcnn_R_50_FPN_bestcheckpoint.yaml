@@ -1,0 +1,12 @@
+_BASE_: "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+SOLVER:
+  MAX_ITER: 150
+  IMS_PER_BATCH: 2
+  BEST_CHECKPOINTER: 
+    ENABLED: true
+    METRIC: "bbox/AP50"
+DATASETS:
+  TRAIN: ("coco_train",)
+  TEST: ("coco_val",)
+TEST:
+  EVAL_PERIOD: 50
