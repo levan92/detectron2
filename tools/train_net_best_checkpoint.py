@@ -24,6 +24,7 @@ from fvcore.nn.precise_bn import get_bn_modules
 
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.config import CfgNode as CN
 from detectron2.config import get_cfg
 from detectron2.data import MetadataCatalog
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
@@ -39,6 +40,20 @@ from detectron2.evaluation import (
     verify_results,
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
+
+
+def add_custom_configs(cfg: CN):
+    """
+    Add config for densepose head.
+    """
+    _C = cfg
+
+    _C.SOLVER.PERIODIC_CHECKPOINTER = CN({"ENABLED": True})   
+    _C.SOLVER.PERIODIC_CHECKPOINTER.PERIOD = _C.SOLVER.CHECKPOINT_PERIOD
+
+    _C.SOLVER.BEST_CHECKPOINTER = CN({"ENABLED": False})
+    _C.SOLVER.BEST_CHECKPOINTER.METRIC = "bbox/AP50"
+    _C.SOLVER.BEST_CHECKPOINTER.MODE = "max"
 
 
 class Trainer(DefaultTrainer):
@@ -80,8 +95,8 @@ class Trainer(DefaultTrainer):
         # be saved by checkpointer.
         # This is not always the best: if checkpointing has a different frequency,
         # some checkpoints may have more precise statistics than others.
-        if comm.is_main_process():
-            ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
+        if cfg.SOLVER.PERIODIC_CHECKPOINTER.ENABLED and comm.is_main_process():
+            ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.PERIODIC_CHECKPOINTER.PERIOD))
 
         def test_and_save_results():
             self._last_eval_results = self.test(self.cfg, self.model)
@@ -92,7 +107,7 @@ class Trainer(DefaultTrainer):
         ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
 
         if cfg.SOLVER.BEST_CHECKPOINTER:
-            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC))
+            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE))
 
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.
@@ -172,6 +187,7 @@ def setup(args):
     Create configs and perform basic setups.
     """
     cfg = get_cfg()
+    add_custom_configs(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()
