@@ -1,3 +1,6 @@
+## Added in this fork
+- Add [best checkpointer hook](https://github.com/levan92/detectron2/blob/51a1e6eff34c32a508ecc1817e467f290be885e7/detectron2/engine/hooks.py#L206) and [example training scripts](https://github.com/levan92/detectron2/blob/master/tools/train_net_best_checkpoint.py) + [config](https://github.com/levan92/detectron2/blob/master/configs/COCO-Detection/faster_rcnn_R_50_FPN_bestcheckpoint.yaml)
+
 <img src=".github/Detectron2-Logo-Horz.svg" width="300" >
 
 Detectron2 is Facebook AI Research's next generation library
